@@ -143,5 +143,97 @@ public class DisputasController : Controller
             return RedirectToAction("Index");
         }
     }
-}
-//Parei na página 7 do PDF Aula 15
+    [HttpGet]
+        public async Task<ActionResult> DisputaGeralAsync()
+        {
+            try
+            {
+                HttpClient httpClient = new HttpClient();
+
+                string token = HttpContext.Session.GetString("SessionTokenUsuario");
+                httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
+
+                string uriBuscaPersonagens = "http://kraio.somee.com/RpgApi/Personagens/GetALL/";
+                HttpResponseMessage response = await httpClient.GetAsync(uriBuscaPersonagens);
+
+                string serialized = await response.Content.ReadAsStringAsync();
+
+                List<PersonagemViewModel> listaPersonagens = await Task.Run(() =>
+                    JsonConvert.DeserializeObject<List<PersonagemViewModel>>(serialized));
+
+                string uriDisputa = "http://kraio.somee.com/RpgApi/Disputas/DisputaEmGrupo/";
+                DisputasViewModel disputa = new DisputasViewModel();
+                disputa.ListaIdPersonagens = new List<int>();
+                disputa.ListaIdPersonagens.AddRange(listaPersonagens.Select(p => p.Id));
+
+                var content = new StringContent(JsonConvert.SerializeObject(disputa));
+                content.Headers.ContentType = new MediaTypeHeaderValue("application/json");
+                response = await httpClient.PostAsync(uriDisputa, content);
+
+                serialized = await response.Content.ReadAsStringAsync();
+
+                if (response.StatusCode == System.Net.HttpStatusCode.OK)
+                {
+                    disputa = await Task.Run(() => JsonConvert.DeserializeObject<DisputasViewModel>(serialized));
+                    TempData["Mensagem"] = string.Join("<br/>", disputa.Resultados);
+                }
+                else
+                    throw new System.Exception(serialized);
+
+                return RedirectToAction("Index", "Personagens");
+            }
+            catch (System.Exception ex)
+            {
+                TempData["MensagemErro"] = ex.Message;
+                return RedirectToAction("Index", "Personagens");
+            }
+        }
+        [HttpGet]
+        public async Task<ActionResult> IndexDisputasAsync()
+        {
+        try
+        {
+            string uriComplementar = "Listar";
+            HttpClient httpClient = new HttpClient();
+            string token = HttpContext.Session.GetString("SessionTokenUsuario");
+            httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue ("Bearer", token);
+            HttpResponseMessage response = await httpClient.GetAsync(uriBase + uriComplementar);
+            string serialized = await response.Content.ReadAsStringAsync();
+            if (response.StatusCode == System.Net.HttpStatusCode.OK)
+            {
+                List<DisputaViewModel> lista = await Task.Run(() =>
+                JsonConvert.DeserializeObject<List<DisputaViewModel>>(serialized));
+                return View(lista);
+            }
+            else
+                throw new System.Exception(serialized);
+            }
+            catch (System.Exception ex)
+            {
+                TempData["MensagemErro"] = ex.Message;
+                return RedirectToAction("Index");
+            }
+        }
+        [HttpGet]
+        public async Task<ActionResult> ApagarDisputasAsync()
+        {
+            try
+            {
+                HttpClient httpClient = new HttpClient();
+                string token = HttpContext.Session.GetString("SessionTokenUsuario");
+                httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
+                string uriComplementar = "ApagarDisputas";
+                HttpResponseMessage response = await httpClient.DeleteAsync(uriBase + uriComplementar);
+                string serialized = await response.Content.ReadAsStringAsync();
+                if (response.StatusCode == System.Net.HttpStatusCode.OK)
+                TempData["Mensagem"] = "Disputas apagadas com sucessso.";
+                else
+                    throw new System.Exception(serialized);
+            }
+            catch (System.Exception ex)
+            {
+                TempData["MensagemErro"] = ex.Message;
+            }
+            return RedirectToAction("IndexDisputas", "Disputas");
+        }
+    }
